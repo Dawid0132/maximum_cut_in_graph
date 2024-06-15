@@ -3,7 +3,8 @@
 #include <random>
 #include <set>
 #include <algorithm>
-#include "memory"
+#include <fstream>
+/*#include "memory"*/
 
 
 #define N - 1;
@@ -202,12 +203,70 @@ int main(int argc, char *argv[]) {
         methods.push_back(argv[i]);
     }
 
-    G g1(5);
-    g1.addEd(1, 2);
-    g1.addEd(3, 2);
-    g1.addEd(2, 1);
-    g1.addEd(0, 1);
-    g1.addEd(1, 4);
+    std::fstream file("/Users/dawid/ClionProjects/maximum_cut_in_graph/edges.txt");
+
+    std::string line;
+    int count = 0;
+    int foo = 0;
+
+    std::vector<std::vector<int>> temp(1);
+
+    if (file.is_open()) {
+        while (getline(file, line)) {
+            if (count % 2 == 0 && count != 0) {
+                foo++;
+                temp.push_back(std::vector<int>());
+            }
+            temp[foo].push_back(atoi(line.c_str()));
+            /*std::cout << line << "\n";*/
+            count++;
+        }
+        /*std::cout << count << "\n";*/
+        file.close();
+    } else {
+        std::cerr << "Unable to open file!\n";
+        return 1;
+    }
+
+    G g1(foo + 1);
+
+
+    count = 0;
+
+    for (const auto &first: temp) {
+        int w = 0;
+        int e = 0;
+
+        if (first.size() >= 2) {
+            w = first[0];
+            e = first[1];
+            g1.addEd(w, e);
+        }
+    }
+
+    /*for (auto &first: temp) {
+        count = 0;
+        int w = 0;
+        int e = 0;
+        for (auto &second: first) {
+            if (count == 0) {
+                w = second;
+            } else {
+                e = second;
+                g1.addEd(w, e);
+            }
+
+            count++;
+        }
+    }*/
+
+
+    /* G g1(5);
+     g1.addEd(1, 2);
+     g1.addEd(3, 2);
+     g1.addEd(2, 1);
+     g1.addEd(0, 1);
+     g1.addEd(1, 4);*/
 
     for (auto &method: methods) {
         if (method == "Con") {
@@ -224,10 +283,8 @@ int main(int argc, char *argv[]) {
             std::cout << "\n Generate neighbour solution \n";
             auto random = generate_random_solution(g1, 0.5);
             auto neighbour = generate_neighbours_solution(random);
-            for (auto &e: neighbour) {
-                for (auto f: e) {
-                    std::cout << (int) f << " ";
-                }
+            for (auto &e: neighbour[0]) {
+                std::cout << (int) e << " ";
             }
             std::cout << "\n";
         } else if (method == "tabu") {
@@ -258,7 +315,6 @@ int main(int argc, char *argv[]) {
             std::cerr << "Unknown method: " << method << "\n";
         }
     }
-    
 
 
     return 0;
@@ -351,7 +407,6 @@ std::vector<char> solve_tabu(G &g, int iterations = 20, int tabu_size = 1000) {
     auto best_solution = random;
     auto goal = goal_factory(g);
 
-
     std::list<std::vector<char>> tabu_list = {random};
     std::set<std::vector<char>> tabu = {random};
 
@@ -376,6 +431,7 @@ std::vector<char> solve_tabu(G &g, int iterations = 20, int tabu_size = 1000) {
         if (goal(random) >= goal(best_solution)) {
             best_solution = random;
         }
+
         tabu_list.push_back(random);
         tabu.insert(random);
         if (tabu.size() > tabu_size) {
