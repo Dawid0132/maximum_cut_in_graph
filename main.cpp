@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+#include <fstream>
 
 using namespace std;
 
@@ -116,7 +117,53 @@ public:
 };
 
 int main() {
-    Graph G(6);
+
+    std::fstream file("/Users/dawid/ClionProjects/maxcut/edges.txt");
+
+    string line;
+    int count = 0;
+    int foo = 0;
+    int v = 0;
+
+    vector<vector<int>> temp(1);
+
+    if (file.is_open()) {
+        while (getline(file, line)) {
+            if (count % 2 == 0 && count != 0) {
+                foo++;
+                temp.push_back(vector<int>());
+            }
+            temp[foo].push_back(atoi(line.c_str()));
+            if (v < atoi(line.c_str())) {
+                v = atoi(line.c_str());
+            }
+            count++;
+        }
+        file.close();
+    } else {
+        cerr << "Unable to open file!\n";
+        return 1;
+    }
+
+    Graph G(v + 1);
+
+    count = 0;
+
+    for (const auto &first: temp) {
+        int u = 0;
+        int v = 0;
+
+        if (first.size() >= 2) {
+            u = first[0];
+            v = first[1];
+
+            cout << u << "\n";
+            cout << v << "\n";
+            G.addEdge(u, v);
+        }
+    }
+
+    /*Graph G(6);
     G.addEdge(0, 1);
     G.addEdge(0, 2);
     G.addEdge(1, 3);
@@ -124,7 +171,7 @@ int main() {
     G.addEdge(3, 4);
     G.addEdge(3, 5);
     G.addEdge(4, 5);
-
+*/
 
     int max_cut = G.maximumCut();
 
