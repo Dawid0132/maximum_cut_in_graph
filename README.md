@@ -1,1 +1,1 @@
-# maximum_cut_in_graph
+# maximum_cut_in_graph - poprawa
