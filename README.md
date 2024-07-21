@@ -1,7 +1,12 @@
 # maximum_cut_in_graph - poprawa
 
 ## Spis treści
+* [Opis problemu](#Opis-problemu)
 * [Dodanie połączeń w grafie](#Dodawanie-połączeń-w-grafie-do-edges.txt)
+
+
+### Opis problemu
+Bazując na https://en.wikipedia.org/wiki/Maximum_cut udało mi się rozwiązać problem poprzez podzielenie wszystkich możliwych wierzchołków na dwie grupy i sprawdzeniu czy wierzchołek z pierwszej grupy ma połączenie z drugim w ostatniej grupie jeśli tak uznawałem to za przecięcie i przeszukując wszytkie możliwe możliwości znajduje w taki sposób największe rozwiązanie
 
 
 ### Dodawanie połączeń w grafie do pliku edges.txt
