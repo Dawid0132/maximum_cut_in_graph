@@ -2,7 +2,7 @@
 
 ## Spis treści
 * [Opis problemu](#Opis-problemu)
-* [Dodanie połączeń w grafie](#Dodawanie-połączeń-w-grafie-do-edges.txt)
+* [Dodanie połączeń w grafie](#Dodawanie-połączeń-w-grafie-do-pliku-edges.txt)
 
 
 ### Opis problemu
