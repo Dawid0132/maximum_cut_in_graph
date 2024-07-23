@@ -3,8 +3,12 @@
 #include <algorithm>
 #include <utility>
 #include <fstream>
+#include <random>
 
 using namespace std;
+
+random_device rd;
+mt19937 rdgen(rd());
 
 void generatePartitions(int V, int index, vector<int> &currentPartition, vector<vector<int>> &partitions) {
     if (index == V) {
@@ -21,15 +25,16 @@ void generatePartitions(int V, int index, vector<int> &currentPartition, vector<
     generatePartitions(V, index + 1, currentPartition, partitions);
 }
 
-int goal_factory(vector<pair<int, int>> e, vector<int> V1, vector<int> V2) {
+int goal_factory(vector<pair<int, int>> e, vector<int> partition) {
     int cut_value = 0;
 
-    for (auto first: V1) {
-        for (auto second: V2) {
-            for (auto edges: e) {
-                if (first == edges.first && second == edges.second ||
-                    first == edges.second && second == edges.first) {
-                    cut_value++;
+    for (int i = 0; i < partition.size(); ++i) {
+        for (int j = 0; j < partition.size(); ++j) {
+            if (partition[i] == 0 && partition[j] == 1) {
+                for (auto edges: e) {
+                    if (i == edges.first && j == edges.second || i == edges.second && j == edges.first) {
+                        cut_value++;
+                    }
                 }
             }
         }
@@ -58,7 +63,30 @@ public:
         return edges;
     }
 
-    int maximumCut() {
+    vector<int> maximumCut() {
+
+        vector<int> currentPartition(V);
+        vector<vector<int>> partitions;
+        generatePartitions(V, 0, currentPartition, partitions);
+
+
+        vector<int> result;
+
+        int max_cut_weight = 0;
+
+        for (auto partition: partitions) {
+            int cut = goal_factory(edges, partition);
+
+            if (max_cut_weight < cut) {
+                max_cut_weight = cut;
+                result = partition;
+            }
+        }
+
+        return result;
+    }
+
+    /*int maximumCut() {
 
         vector<int> currentPartition(V);
         vector<vector<int>> partitions;
@@ -113,8 +141,106 @@ public:
         cout << "\n";
 
         return max_cut_weight;
+    }*/
+
+    int getVertices() {
+        return V;
     }
 };
+
+void printDetailsAboutCut(Graph g, vector<int> partition) {
+
+    auto max_cut = goal_factory(g.getEdges(), partition);
+
+    vector<vector<int>> group_of_cut(2);
+
+    for (int i = 0; i < g.getVertices(); ++i) {
+        if (partition[i] > 0) {
+            group_of_cut[0].push_back(i);
+        } else {
+            group_of_cut[1].push_back(i);
+        }
+    }
+
+    cout << "V1: [ ";
+    for (auto v1: group_of_cut[0]) {
+        cout << v1 << " ";
+    }
+    cout << "]\n";
+
+    cout << "V2: [ ";
+    for (auto v2: group_of_cut[1]) {
+        cout << v2 << " ";
+    }
+    cout << "]\n";
+
+    cout << "Waga maksymalnego przecięcia: " << max_cut << "\n";
+
+}
+
+vector<int> generate_random_cut(Graph g, double p_1 = 0.5) {
+
+    vector<int> group_of_cuts;
+
+    uniform_real_distribution<double> dist(0.0, 1.0);
+
+    for (int i = 0; i < g.getVertices(); ++i) {
+        auto e = (dist(rdgen) < p_1) ? 1 : 0;
+
+        if (e > 0) {
+            group_of_cuts.push_back(0);
+        } else {
+            group_of_cuts.push_back(1);
+        }
+    }
+    return group_of_cuts;
+}
+
+vector<int> generate_neighbours_cut(Graph g, vector<int> partition) {
+
+    vector<int> neighbour_partition;
+
+    for (auto p: partition) {
+        if (p > 0) {
+            neighbour_partition.push_back(0);
+        } else {
+            neighbour_partition.push_back(1);
+        }
+    }
+
+    /*vector<vector<int>> neighbour_generate = fill_each_group(g, neighbour_partition);*/
+
+    /*int max_cut = goal_factory(g.getEdges(), neighbour_generate[0], neighbour_generate[1]);
+
+    printDetailsAboutCut(neighbour_generate, max_cut);*/
+
+    return neighbour_partition;
+}
+
+vector<int> solve_random(Graph g, int iterations = 20, double p_1 = 0.5) {
+    auto random_cut_partition = generate_random_cut(g, p_1);
+    /*auto random_cut = fill_each_group(g, random_cut_partition);*/
+    int cut_value_temp = 0;
+    int cut_value = goal_factory(g.getEdges(), random_cut_partition);
+
+    for (int i = 0; i < iterations; i++) {
+
+        auto random_cuts_partiton = generate_random_cut(g, p_1);
+        /*auto random_cuts = fill_each_group(g, random_cuts_partiton);*/
+
+        cut_value_temp = goal_factory(g.getEdges(), random_cuts_partiton);
+
+        if (cut_value_temp >= cut_value) {
+            cut_value = cut_value_temp;
+            random_cut_partition = random_cuts_partiton;
+        }
+    }
+
+
+    /*printDetailsAboutCut(random_cut, cut_value);*/
+
+    return random_cut_partition;
+}
 
 int main() {
 
@@ -157,25 +283,18 @@ int main() {
             u = first[0];
             v = first[1];
 
-            cout << u << "\n";
-            cout << v << "\n";
             G.addEdge(u, v);
         }
     }
 
-    /*Graph G(6);
-    G.addEdge(0, 1);
-    G.addEdge(0, 2);
-    G.addEdge(1, 3);
-    G.addEdge(2, 4);
-    G.addEdge(3, 4);
-    G.addEdge(3, 5);
-    G.addEdge(4, 5);
-*/
+    vector<int> bar = solve_random(G, 100);
 
-    int max_cut = G.maximumCut();
+    printDetailsAboutCut(G, bar);
 
-    cout << "Waga maksymalnego przecięcia: " << max_cut << endl;
+    bar = generate_neighbours_cut(G, bar);
+
+    printDetailsAboutCut(G, bar);
+
 
     return 0;
 }
