@@ -4,6 +4,8 @@
 #include <utility>
 #include <fstream>
 #include <random>
+#include <list>
+#include <set>
 
 using namespace std;
 
@@ -25,22 +27,25 @@ void generatePartitions(int V, int index, vector<int> &currentPartition, vector<
     generatePartitions(V, index + 1, currentPartition, partitions);
 }
 
-int goal_factory(vector<pair<int, int>> e, vector<int> partition) {
-    int cut_value = 0;
+function<int(const vector<int> &)> goal_factory(const vector<pair<int, int>> &edges) {
+    return [=](const vector<int> &cut) {
+        int cut_value = 0;
 
-    for (int i = 0; i < partition.size(); ++i) {
-        for (int j = 0; j < partition.size(); ++j) {
-            if (partition[i] == 0 && partition[j] == 1) {
-                for (auto edges: e) {
-                    if (i == edges.first && j == edges.second || i == edges.second && j == edges.first) {
-                        cut_value++;
+        for (int i = 0; i < cut.size(); ++i) {
+            for (int j = 0; j < cut.size(); ++j) {
+                if (cut[i] == 0 && cut[j] == 1) {
+                    for (const auto &e: edges) {
+                        if (i == e.first && j == e.second || i == e.second && j == e.first) {
+                            cut_value++;
+                        }
                     }
                 }
             }
         }
-    }
 
-    return cut_value;
+
+        return cut_value;
+    };
 }
 
 class Graph {
@@ -68,14 +73,14 @@ public:
         vector<int> currentPartition(V);
         vector<vector<int>> partitions;
         generatePartitions(V, 0, currentPartition, partitions);
-
+        auto goal = goal_factory(edges);
 
         vector<int> result;
 
         int max_cut_weight = 0;
 
         for (auto partition: partitions) {
-            int cut = goal_factory(edges, partition);
+            int cut = goal(partition);
 
             if (max_cut_weight < cut) {
                 max_cut_weight = cut;
@@ -86,63 +91,6 @@ public:
         return result;
     }
 
-    /*int maximumCut() {
-
-        vector<int> currentPartition(V);
-        vector<vector<int>> partitions;
-        generatePartitions(V, 0, currentPartition, partitions);
-
-
-        int max_cut_weight = 0;
-        int index = 0;
-        int temp = 0;
-
-        for (const auto &partition: partitions) {
-            vector<int> V1, V2;
-
-            for (size_t i = 0; i < partitions.size(); i++) {
-                if (partition[i] == 0) {
-                    V1.push_back(i);
-                } else {
-                    V2.push_back(i);
-                }
-            }
-
-            int cut = goal_factory(edges, V1, V2);
-
-            if (max_cut_weight < cut) {
-                max_cut_weight = cut;
-                temp = index;
-            }
-
-            index++;
-        }
-
-        vector<int> V1, V2;
-
-        for (size_t i = 0; i < partitions[temp].size(); ++i) {
-            if (partitions[temp][i] == 0) {
-                V1.push_back(i);
-            } else {
-                V2.push_back(i);
-            }
-        }
-
-        cout << "V1: ";
-        for (int v: V1) {
-            cout << v << " ";
-        }
-
-        cout << " | V2: ";
-        for (int v: V2) {
-            cout << v << " ";
-        }
-
-        cout << "\n";
-
-        return max_cut_weight;
-    }*/
-
     int getVertices() {
         return V;
     }
@@ -150,7 +98,9 @@ public:
 
 void printDetailsAboutCut(Graph g, vector<int> partition) {
 
-    auto max_cut = goal_factory(g.getEdges(), partition);
+    auto goal = goal_factory(g.getEdges());
+
+    auto max_cut = goal(partition);
 
     vector<vector<int>> group_of_cut(2);
 
@@ -196,50 +146,149 @@ vector<int> generate_random_cut(Graph g, double p_1 = 0.5) {
     return group_of_cuts;
 }
 
-vector<int> generate_neighbours_cut(Graph g, vector<int> partition) {
+vector<vector<int>> generate_neighbours_cut(Graph g, vector<int> partition) {
 
-    vector<int> neighbour_partition;
+    vector<vector<int>> neighbour_partition;
 
-    for (auto p: partition) {
-        if (p > 0) {
-            neighbour_partition.push_back(0);
-        } else {
-            neighbour_partition.push_back(1);
-        }
+
+    for (int i = 0; i < partition.size(); ++i) {
+        auto modified = partition;
+        modified[i] = 1 - modified[i];
+        neighbour_partition.push_back(modified);
     }
-
-    /*vector<vector<int>> neighbour_generate = fill_each_group(g, neighbour_partition);*/
-
-    /*int max_cut = goal_factory(g.getEdges(), neighbour_generate[0], neighbour_generate[1]);
-
-    printDetailsAboutCut(neighbour_generate, max_cut);*/
 
     return neighbour_partition;
 }
 
 vector<int> solve_random(Graph g, int iterations = 20, double p_1 = 0.5) {
+
+    auto goal = goal_factory(g.getEdges());
     auto random_cut_partition = generate_random_cut(g, p_1);
-    /*auto random_cut = fill_each_group(g, random_cut_partition);*/
     int cut_value_temp = 0;
-    int cut_value = goal_factory(g.getEdges(), random_cut_partition);
+    int cut_value = goal(random_cut_partition);
 
     for (int i = 0; i < iterations; i++) {
 
-        auto random_cuts_partiton = generate_random_cut(g, p_1);
-        /*auto random_cuts = fill_each_group(g, random_cuts_partiton);*/
+        auto random_cuts_partition = generate_random_cut(g, p_1);
 
-        cut_value_temp = goal_factory(g.getEdges(), random_cuts_partiton);
+        cut_value_temp = goal(random_cuts_partition);
 
         if (cut_value_temp >= cut_value) {
             cut_value = cut_value_temp;
-            random_cut_partition = random_cuts_partiton;
+            random_cut_partition = random_cuts_partition;
         }
     }
 
-
-    /*printDetailsAboutCut(random_cut, cut_value);*/
-
     return random_cut_partition;
+}
+
+vector<int> generate_next_solution(vector<int> partition) {
+    for (int i = 0; i < partition.size(); ++i) {
+        if (partition[i] == 0) {
+            partition[i] = 1;
+            return partition;
+        }
+        partition[i] = 0;
+    }
+    return partition;
+}
+
+vector<int> generate_first_cut(Graph g) {
+    vector<int> first(g.getVertices());
+    return first;
+}
+
+vector<int> solve(Graph g) {
+
+    auto goal = goal_factory(g.getEdges());
+    auto cut = generate_first_cut(g.getVertices());
+
+    auto best_goal_value = goal(cut);
+
+    auto best_solution = cut;
+
+    while (true) {
+        cut = generate_next_solution(cut);
+
+        int next_goal_value = goal(cut);
+
+        if (next_goal_value > best_goal_value) {
+            best_goal_value = next_goal_value;
+            best_solution = cut;
+        }
+        int s = 0;
+
+        for (auto e: cut) {
+            s += e;
+        }
+
+        if (s == 0) break;
+    }
+    return best_solution;
+}
+
+vector<int> solve_hill_climbing(Graph g, int iterations = 20) {
+    auto cut = generate_random_cut(g);
+    auto goal = goal_factory(g.getEdges());
+
+    for (int i = 0; i < iterations; ++i) {
+        auto cuts = generate_neighbours_cut(g, cut);
+        auto next_cut = *max_element(cuts.begin(), cuts.end(), [=](auto a, auto b) {
+            return goal(a) < goal(b);
+        });
+
+        if (goal(next_cut) > goal(cut)) {
+            cut = next_cut;
+        } else {
+            break;
+        }
+
+    }
+
+    return cut;
+}
+
+vector<int> solve_tabu(const Graph &g, int iterations = 20, int tabu_size = 1000) {
+    auto cut = generate_random_cut(g);
+    auto best_cut = cut;
+    auto goal = goal_factory(g.getEdges());
+
+    std::list<vector<int>> tabu_list = {cut};
+    std::set<vector<int>> tabu = {cut};
+
+
+    auto is_in_tabu = [&](vector<int> &e) -> bool {
+        return tabu.count(e) > 0;
+    };
+
+    for (int i = 0; i < iterations; ++i) {
+
+        vector<vector<int>> cuts;
+
+        for (auto c: generate_neighbours_cut(g, cut)) {
+            if (!is_in_tabu(c))
+                cuts.push_back(c);
+        }
+
+        auto cut_next = *std::max_element(cuts.begin(), cuts.end(), [=](auto a, auto b) {
+            return goal(a) < goal(b);
+        });
+
+        cut = cut_next;
+
+        if (goal(cut) >= goal(best_cut)) {
+            best_cut = cut;
+        }
+
+        tabu_list.push_back(cut);
+        tabu.insert(cut);
+        if (tabu.size() > tabu_size) {
+            tabu.erase(tabu_list.front());
+            tabu_list.pop_front();
+        }
+
+    }
+    return best_cut;
 }
 
 int main() {
@@ -287,14 +336,9 @@ int main() {
         }
     }
 
-    vector<int> bar = solve_random(G, 100);
+    vector<int> bar = solve_tabu(G, 10);
 
     printDetailsAboutCut(G, bar);
-
-    bar = generate_neighbours_cut(G, bar);
-
-    printDetailsAboutCut(G, bar);
-
 
     return 0;
 }
