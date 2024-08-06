@@ -291,6 +291,214 @@ vector<int> solve_tabu(const Graph &g, int iterations = 20, int tabu_size = 1000
     return best_cut;
 }
 
+vector<int> generate_random_neighbour_norm(vector<int> partition) {
+    /*std::normal_distribution<double> distr;*/
+    uniform_real_distribution<double> dist(0.0, 1.0);
+
+    int count = dist(rdgen) + 1;
+    /*int count = distr(rdgen) + 1;*/
+
+    if (count >= (partition.size() * 2))
+        count = partition.size();
+
+    for (int i = 0; i < count; ++i) {
+        std::uniform_int_distribution<int> selbit(0, partition.size() - 1);
+        int sel = selbit(rdgen);
+        partition[sel] = 1 - partition[sel];
+    }
+
+    return partition;
+}
+
+vector<int> solve_sim_annealing(const Graph g, int iterations = 20,
+                                std::function<double(int)> T = [](auto i) { return 1 / (i + 1); }) {
+
+    auto cut_partition = generate_random_cut(g);
+    auto best_cut = cut_partition;
+    auto goal = goal_factory(g.getEdges());
+
+    for (int i = 0; i < iterations; ++i) {
+        auto t = generate_random_neighbour_norm(cut_partition);
+
+        if (goal(t) >= goal(cut_partition)) {
+            cut_partition = t;
+            if (goal(cut_partition) >= goal(best_cut)) {
+                best_cut = cut_partition;
+            }
+        } else {
+            std::uniform_real_distribution<double> u(0.0, 1.0);
+            if (u(rdgen) < exp((abs(goal(t) - goal(cut_partition)) / T(i)))) {
+                cut_partition = t;
+            }
+        }
+    }
+    return best_cut;
+}
+
+vector<int> fit(const vector<vector<int>> &population, std::function<int(const vector<int> &)> &fitness) {
+    vector<int> ret;
+    for (auto &e: population) {
+        ret.push_back(fitness(e));
+    }
+    return ret;
+}
+
+vector<int> selection(const vector<int> &fitnesses) {
+    std::uniform_int_distribution<int> u(0, fitnesses.size() - 1);
+    vector<int> result;
+
+    for (int i = 0; i < fitnesses.size(); ++i) {
+        int idx1 = u(rdgen);
+        int idx2 = u(rdgen);
+
+        if (fitnesses.at(idx1) > fitnesses.at(idx2))
+            result.push_back(idx1);
+        else
+            result.push_back(idx2);
+    }
+
+    return result;
+}
+
+vector<vector<int>> crossover_one_point(const vector<vector<int>> &parents) {
+    vector<vector<int>> children(2);
+    std::uniform_int_distribution<int> u(0, parents[0].size() - 1);
+
+    int cross_point = u(rdgen);
+
+    for (int i = 0; i < parents[0].size(); ++i) {
+        if (i < cross_point) {
+            children[0].push_back(parents[0][i]);
+            children[1].push_back(parents[1][i]);
+        } else {
+            children[0].push_back(parents[1][i]);
+            children[1].push_back(parents[0][i]);
+        }
+    }
+    return children;
+}
+
+vector<vector<int>> crossover(const vector<vector<int>> &population, vector<int> parents, double prob_crossover) {
+    vector<vector<int>> ret;
+    std::uniform_real_distribution<double> u(0.0, 1.0);
+
+    for (int i = 0; i < population.size(); i += 2) {
+        vector<int> e = population[parents[i]];
+        vector<int> f = population[parents[i + 1]];
+
+        vector<vector<int>> parents = {e, f};
+
+        vector<vector<int>> children;
+
+        if (u(rdgen) < prob_crossover)
+            children = crossover_one_point(parents);
+        else
+            children = parents;
+
+        for (auto &o: children)
+            ret.push_back(o);
+
+
+    }
+    return ret;
+}
+
+vector<int> bit_flip_mutation(const vector<int> &p, double prob_mutation) {
+    std::uniform_real_distribution<double> u(0.0, 1.0);
+    auto ret = p;
+
+    for (int i = 0; i < p.size(); ++i) {
+        if (u(rdgen) < prob_mutation)
+            ret[i] = 1 - ret[i];
+    }
+
+    return ret;
+}
+
+vector<int> inversion_mutation(const vector<int> &p, double prob_mutation) {
+
+    std::uniform_real_distribution<double> u(0.0, 1.0);
+
+    std::uniform_int_distribution<int> start_subset(0, p.size() - 1);
+    int start = start_subset(rdgen);
+
+    std::uniform_int_distribution<int> end_subset(start, p.size() - 1);
+    int end = end_subset(rdgen);
+
+
+    auto ret = p;
+
+    if (u(rdgen) < prob_mutation) {
+        for (int i = start; i < end; ++i) {
+            int temp = ret[i];
+            ret[i] = ret[end];
+            ret[end] = temp;
+
+            end--;
+        }
+    }
+
+    return ret;
+}
+
+vector<vector<int>> mutation(const vector<vector<int>> &specimens, double prob_mutation, bool mutation_type) {
+    std::uniform_real_distribution<double> u(0.0, 1.0);
+    vector<vector<int>> ret;
+
+    for (auto s: specimens)
+        if (mutation_type) {
+            ret.push_back(bit_flip_mutation(s, prob_mutation));
+        } else {
+            ret.push_back(inversion_mutation(s, prob_mutation));
+        }
+
+
+    return specimens;
+}
+
+vector<int>
+solve_genetic_algorithm(const Graph g, int iterations = 20, int pop_size = 100, double prob_crossover = 0.9,
+                        double prob_mutation = 0.01, bool conv_log = true, bool mutation_type = true) {
+
+    vector<vector<int>> population;
+    vector<int> best_cut;
+
+    for (int i = 0; i < pop_size; ++i)
+        population.push_back(generate_random_cut(g));
+
+    auto goal = goal_factory(g.getEdges());
+
+    function<int(const vector<int> &)> fitness = [goal](const vector<int> &specimen) {
+        int g = goal(specimen);
+
+        if (g < 0)
+            return 0;
+
+        return g;
+    };
+
+    auto get_best = [&]() {
+        return *std::max_element(population.begin(), population.end(), [&fitness](auto &l, auto &r) {
+            return fitness(l) < fitness(r);
+        });
+    };
+
+    for (int i = 0; i < iterations; ++i) {
+        vector<int> fitnesses = fit(population, fitness);
+        vector<int> parents = selection(fitnesses);
+        vector<vector<int>> offspring = crossover(population, parents, prob_crossover);
+        offspring = mutation(offspring, prob_mutation, mutation_type);
+        population = offspring;
+
+
+        if (goal(best_cut) < fitness(get_best())) {
+            best_cut = get_best();
+        }
+    }
+
+    return best_cut;
+}
+
 int main() {
 
     std::fstream file("/Users/dawid/ClionProjects/maxcut/edges.txt");
@@ -336,7 +544,7 @@ int main() {
         }
     }
 
-    vector<int> bar = solve_tabu(G, 10);
+    vector<int> bar = solve_genetic_algorithm(G, 1, 100, 0.9, 0.5);
 
     printDetailsAboutCut(G, bar);
 
