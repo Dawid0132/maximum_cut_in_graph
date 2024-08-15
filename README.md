@@ -14,6 +14,7 @@
   <li>Algorytm wspinaczkowy z wyborem najlepszego sąsiada</li>
   <li>Algorytm tabu</li>
   <li>Algorytm symulowanego wyżarzania</li>
+  <li>Algorytm genetyczny</li>
 </ul>
 
 ### Opis problemu
