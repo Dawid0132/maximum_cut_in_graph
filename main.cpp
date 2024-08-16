@@ -53,6 +53,7 @@ private:
     int V;
     vector<pair<int, int>> edges;
     vector<vector<int>> max_cuts;
+    int max_cut;
 
 public:
 
@@ -88,11 +89,17 @@ public:
             }
         }
 
+        max_cut = goal(result);
+
         return result;
     }
 
-    int getVertices() {
+    const int getVertices() const {
         return V;
+    }
+
+    const int getMaxCut() const {
+        return max_cut;
     }
 };
 
@@ -125,7 +132,6 @@ void printDetailsAboutCut(Graph g, vector<int> partition) {
     cout << "]\n";
 
     cout << "Waga maksymalnego przecięcia: " << max_cut << "\n";
-
 }
 
 vector<int> generate_random_cut(Graph g, double p_1 = 0.5) {
@@ -227,7 +233,7 @@ vector<int> solve(Graph g) {
     return best_solution;
 }
 
-vector<int> solve_hill_climbing(Graph g, int iterations = 20) {
+vector<int> solve_hill_climbing_best_neighbour(Graph g, int iterations = 20) {
     auto cut = generate_random_cut(g);
     auto goal = goal_factory(g.getEdges());
 
@@ -245,6 +251,26 @@ vector<int> solve_hill_climbing(Graph g, int iterations = 20) {
 
     }
 
+    return cut;
+}
+
+vector<int> solve_hill_climbing_random_neighbour(Graph g, int iterations = 20) {
+    auto cut = generate_random_cut(g);
+    auto goal = goal_factory(g.getEdges());
+
+    std::uniform_int_distribution<int> u(0, g.getVertices() - 1);
+
+    for (int i = 0; i < iterations; ++i) {
+        auto cuts = generate_neighbours_cut(g, cut);
+        int idx = u(rdgen);
+
+        if (goal(cuts.at(idx)) > goal(cut)) {
+            cut = cuts.at(idx);
+        } else {
+            break;
+        }
+
+    }
     return cut;
 }
 
@@ -378,7 +404,35 @@ vector<vector<int>> crossover_one_point(const vector<vector<int>> &parents) {
     return children;
 }
 
-vector<vector<int>> crossover(const vector<vector<int>> &population, vector<int> parents, double prob_crossover) {
+vector<vector<int>> crossover_two_point(const vector<vector<int>> &parents) {
+    vector<vector<int>> children(2);
+
+    std::uniform_int_distribution<int> u(0, parents[0].size() - 1);
+
+    int cross_point_start = u(rdgen);
+
+    std::uniform_int_distribution<int> u1(cross_point_start, parents[0].size() - 1);
+
+    int cross_point_end = u1(rdgen);
+
+    for (int i = 0; i < parents[0].size(); ++i) {
+        if (i < cross_point_start) {
+            children[0].push_back(parents[0][i]);
+            children[1].push_back(parents[1][i]);
+        } else if (i > cross_point_end) {
+            children[0].push_back(parents[0][i]);
+            children[1].push_back(parents[1][i]);
+        } else {
+            children[0].push_back(parents[1][i]);
+            children[1].push_back(parents[0][i]);
+        }
+    }
+
+    return children;
+}
+
+vector<vector<int>>
+crossover(const vector<vector<int>> &population, vector<int> parents, double prob_crossover, bool crossover_type) {
     vector<vector<int>> ret;
     std::uniform_real_distribution<double> u(0.0, 1.0);
 
@@ -391,7 +445,11 @@ vector<vector<int>> crossover(const vector<vector<int>> &population, vector<int>
         vector<vector<int>> children;
 
         if (u(rdgen) < prob_crossover)
-            children = crossover_one_point(parents);
+            if (crossover_type) {
+                children = crossover_one_point(parents);
+            } else {
+                children = crossover_two_point(parents);
+            }
         else
             children = parents;
 
@@ -458,7 +516,10 @@ vector<vector<int>> mutation(const vector<vector<int>> &specimens, double prob_m
 
 vector<int>
 solve_genetic_algorithm(const Graph g, int iterations = 20, int pop_size = 100, double prob_crossover = 0.9,
-                        double prob_mutation = 0.01, bool conv_log = true, bool mutation_type = true) {
+                        double prob_mutation = 0.01, bool conv_log = true, bool mutation_type = true,
+                        bool crossover_type = true, bool end_type = true) {
+
+    int improvmentCounter = 0;
 
     vector<vector<int>> population;
     vector<int> best_cut;
@@ -486,20 +547,40 @@ solve_genetic_algorithm(const Graph g, int iterations = 20, int pop_size = 100, 
     for (int i = 0; i < iterations; ++i) {
         vector<int> fitnesses = fit(population, fitness);
         vector<int> parents = selection(fitnesses);
-        vector<vector<int>> offspring = crossover(population, parents, prob_crossover);
+        vector<vector<int>> offspring = crossover(population, parents, prob_crossover, crossover_type);
         offspring = mutation(offspring, prob_mutation, mutation_type);
         population = offspring;
 
-
-        if (goal(best_cut) < fitness(get_best())) {
-            best_cut = get_best();
+        if (end_type) {
+            if (g.getMaxCut() == fitness(get_best())) {
+                break;
+            }
+        } else {
+            if (goal(best_cut) < fitness(get_best())) {
+                best_cut = get_best();
+                improvmentCounter = 0;
+            } else if (improvmentCounter == 10) {
+                break;
+            } else {
+                improvmentCounter++;
+            }
         }
     }
 
-    return best_cut;
+    return get_best();
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+
+    if (argc < 2) {
+        std::cerr << "Musisz podać conajmniej jeden argument\n";
+        return 1;
+    }
+
+    vector<string> output_methods;
+    for (int i = 1; i < argc; ++i) {
+        output_methods.push_back(argv[i]);
+    }
 
     std::fstream file("/Users/dawid/ClionProjects/maxcut/edges.txt");
 
@@ -544,9 +625,58 @@ int main() {
         }
     }
 
-    vector<int> bar = solve_genetic_algorithm(G, 1, 100, 0.9, 0.5);
+    vector<string> methods = {"Własna metoda", "Metoda losowości", "Algorytm pełnego przeglądu",
+                              "Algorytm wspinaczkowy najlepszy sąsiad", "Algorytm wspinaczkowy losowy sąsiad",
+                              "Algorytm tabu", "Algorytm symulowanego wyżarzania", "Algorytm genetyczny"};
 
-    printDetailsAboutCut(G, bar);
+    int indexOfMethods = 0;
+
+    G.maximumCut();
+
+    vector<int> result;
+
+    for (auto &method: methods) {
+        for (auto &omethod: output_methods) {
+            if (method == omethod) {
+                switch (indexOfMethods) {
+                    case 0:
+                        result = G.maximumCut();
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 1:
+                        result = solve_random(G);
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 2:
+                        result = solve(G);
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 3:
+                        result = solve_hill_climbing_best_neighbour(G);
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 4:
+                        result = solve_hill_climbing_random_neighbour(G,1000);
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 5:
+                        result = solve_tabu(G);
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 6:
+                        result = solve_sim_annealing(G);
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 7:
+                        result = solve_genetic_algorithm(G);
+                        printDetailsAboutCut(G, result);
+                        break;
+                }
+                break;
+            }
+            indexOfMethods++;
+        }
+    }
 
     return 0;
 }
