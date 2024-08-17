@@ -1,0 +1,18 @@
+Metoda: Algorytm wspinaczkowy najlepszy sąsiad
+Iteracje: 1000
+Zbieżność: 0
+Zasoby: 1000
+Cut: 5
+Czas: 33193000
+Metoda: Algorytm wspinaczkowy losowy sąsiad
+Iteracje: 1000
+Zbieżność: 1
+Zasoby: 999
+Cut: 5
+Czas: 407000
+Metoda: Metoda losowości
+Iteracje: 1000
+Zbieżność: 964
+Zasoby: 36
+Cut: 6
+Czas: 8353000

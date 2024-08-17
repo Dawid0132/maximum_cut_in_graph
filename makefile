@@ -1,6 +1,7 @@
 SRC = main.cpp
 EXEC = metaheuristic_project
 SCRIPT = compare_methods.zsh
+PYTHON_FILE = /Users/dawid/PycharmProjects/compareMethods/compare_method.py
 
 CXX = g++
 CXXFLAGS = -std=c++20
@@ -19,4 +20,9 @@ script: $(SCRIPT)
 	@echo "\nWybór metod\n"
 	@zsh $(SCRIPT)
 
-.PHONY: all clean script
+python:
+	@echo "\nUruchamianie skryptu pythona\n"
+	@python3 $(PYTHON_FILE)
+
+
+.PHONY: all clean script python
