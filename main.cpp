@@ -6,11 +6,13 @@
 #include <random>
 #include <list>
 #include <set>
+#include <sstream>
 
 using namespace std;
 
 random_device rd;
 mt19937 rdgen(rd());
+ofstream plik;
 
 void generatePartitions(int V, int index, vector<int> &currentPartition, vector<vector<int>> &partitions) {
     if (index == V) {
@@ -89,7 +91,16 @@ public:
             }
         }
 
-        max_cut = goal(result);
+        /*if (plik.is_open()) {
+            plik << "Własna metoda\n";
+            plik << "Zbieżność: " << convergence << "\n";
+            plik << "Cut: " << max_cut_weight << "\n";
+            plik.close();
+        } else {
+            cerr << "Nie można otworzyć pliku do zapisu\n";
+        }*/
+
+        max_cut = max_cut_weight;
 
         return result;
     }
@@ -102,6 +113,109 @@ public:
         return max_cut;
     }
 };
+
+void updateOrAddEntry(const std::string &filename, const std::string &method, int iterations, int convergence,
+                      int cut_value) {
+
+    std::ifstream plik(filename);
+    std::stringstream buffer;
+    std::string line;
+
+    bool methodFound = false;
+
+    vector<string> lines;
+
+    if (plik.is_open()) {
+        while (std::getline(plik, line)) {
+            lines.push_back(line);
+
+            if (line.find("Metoda: " + method) != string::npos) {
+                methodFound = true;
+
+                lines.push_back("Iteracje: " + std::to_string(iterations));
+                lines.push_back("Zbieżność: " + std::to_string(convergence));
+                lines.push_back("Zasoby: " + std::to_string(iterations - convergence));
+                lines.push_back("Cut: " + std::to_string(cut_value));
+
+
+                std::getline(plik, line);
+                std::getline(plik, line);
+                std::getline(plik, line);
+                std::getline(plik, line);
+            }
+
+        }
+        plik.close();
+    }
+
+    if (!methodFound) {
+        lines.push_back("Metoda: " + method);
+        lines.push_back("Iteracje: " + std::to_string(iterations));
+        lines.push_back("Zbieżność: " + std::to_string(convergence));
+        lines.push_back("Zasoby: " + std::to_string(iterations - convergence));
+        lines.push_back("Cut: " + std::to_string(cut_value));
+    }
+
+    ofstream outFile(filename);
+
+    if (outFile.is_open()) {
+        for (const auto &l: lines) {
+            outFile << l << "\n";
+        }
+        outFile.close();
+    } else {
+        std::cerr << "Nie można otworzyć pliku do zapisu\n";
+    }
+
+}
+
+void updateOrAddTimeEntry(const std::string &filename, const std::string &method,
+                          const std::chrono::nanoseconds &computation_time) {
+    std::ifstream plik(filename);
+    std::stringstream buffer;
+    std::string line;
+    bool methodFound = false;
+
+    vector<string> lines;
+
+    if (plik.is_open()) {
+        while (std::getline(plik, line)) {
+            lines.push_back(line);
+
+            if (line.find("Metoda: " + method) != std::string::npos) {
+                methodFound = true;
+
+                std::getline(plik, line);
+                lines.push_back(line);
+                std::getline(plik, line);
+                lines.push_back(line);
+                std::getline(plik, line);
+                lines.push_back(line);
+                std::getline(plik, line);
+                lines.push_back(line);
+
+
+                std::getline(plik, line);
+                if (line.find("Czas:") != std::string::npos) {
+                    lines.push_back("Czas: " + to_string(computation_time.count()));
+                } else {
+                    lines.push_back("Czas: " + to_string(computation_time.count()));
+                }
+            }
+        }
+        plik.close();
+    }
+
+    ofstream outFile(filename);
+    if (outFile.is_open()) {
+        for (const auto &l: lines) {
+            outFile << l << "\n";
+        }
+        outFile.close();
+    } else {
+        std::cerr << "Nie można otworzyć pliku do zapisu\n";
+    }
+}
 
 void printDetailsAboutCut(Graph g, vector<int> partition) {
 
@@ -168,6 +282,8 @@ vector<vector<int>> generate_neighbours_cut(Graph g, vector<int> partition) {
 
 vector<int> solve_random(Graph g, int iterations = 20, double p_1 = 0.5) {
 
+    int convergence = 0;
+
     auto goal = goal_factory(g.getEdges());
     auto random_cut_partition = generate_random_cut(g, p_1);
     int cut_value_temp = 0;
@@ -175,15 +291,34 @@ vector<int> solve_random(Graph g, int iterations = 20, double p_1 = 0.5) {
 
     for (int i = 0; i < iterations; i++) {
 
+        convergence++;
+
         auto random_cuts_partition = generate_random_cut(g, p_1);
 
         cut_value_temp = goal(random_cuts_partition);
 
-        if (cut_value_temp >= cut_value) {
+        if (cut_value_temp > cut_value) {
+            convergence = 0;
             cut_value = cut_value_temp;
             random_cut_partition = random_cuts_partition;
         }
+
     }
+
+    updateOrAddEntry("results.txt", "Metoda losowości", iterations, convergence, cut_value);
+
+    /*plik.open("results.txt", ios_base::app);
+
+    if (plik.is_open()) {
+        plik << "Metoda: Metoda losowości\n";
+        plik << "Iteracje: " << iterations << "\n";
+        plik << "Zbieżność: " << convergence << "\n";
+        plik << "Zasoby: " << iterations - convergence << "\n";
+        plik << "Cut: " << cut_value << "\n";
+        plik.close();
+    } else {
+        cerr << "Nie można otworzyć pliku do zapisu\n";
+    }*/
 
     return random_cut_partition;
 }
@@ -229,48 +364,97 @@ vector<int> solve(Graph g) {
         }
 
         if (s == 0) break;
+
     }
+
     return best_solution;
 }
 
 vector<int> solve_hill_climbing_best_neighbour(Graph g, int iterations = 20) {
+
+    int convergence = 0;
     auto cut = generate_random_cut(g);
     auto goal = goal_factory(g.getEdges());
+    int best_value = goal(cut);
 
     for (int i = 0; i < iterations; ++i) {
+        convergence++;
         auto cuts = generate_neighbours_cut(g, cut);
         auto next_cut = *max_element(cuts.begin(), cuts.end(), [=](auto a, auto b) {
             return goal(a) < goal(b);
         });
 
-        if (goal(next_cut) > goal(cut)) {
+        int next_value = goal(next_cut);
+
+        if (next_value >= best_value) {
+            best_value = next_value;
             cut = next_cut;
+            convergence = 0;
         } else {
             break;
         }
 
     }
 
+
+    updateOrAddEntry("results.txt", "Algorytm wspinaczkowy najlepszy sąsiad", iterations, convergence, best_value);
+    /*plik.open("results.txt", ios_base::app);
+
+    if (plik.is_open()) {
+        plik << "Metoda: Algorytm wspinaczkowy najlepszy sąsiad\n";
+        plik << "Iteracje: " << iterations << "\n";
+        plik << "Zbieżność: " << convergence << "\n";
+        plik << "Zasoby: " << iterations - convergence << "\n";
+        plik << "Cut: " << goal(cut) << "\n";
+        plik.close();
+    } else {
+        cerr << "Nie można otworzyć pliku do zapisu\n";
+    }*/
+
     return cut;
 }
 
 vector<int> solve_hill_climbing_random_neighbour(Graph g, int iterations = 20) {
+    int convergence = 0;
     auto cut = generate_random_cut(g);
     auto goal = goal_factory(g.getEdges());
+
+    int best_value = goal(cut);
 
     std::uniform_int_distribution<int> u(0, g.getVertices() - 1);
 
     for (int i = 0; i < iterations; ++i) {
+        convergence++;
         auto cuts = generate_neighbours_cut(g, cut);
         int idx = u(rdgen);
 
-        if (goal(cuts.at(idx)) > goal(cut)) {
+        int next_value = goal(cuts.at(idx));
+
+        if (next_value >= best_value) {
+            best_value = next_value;
+            convergence = 0;
             cut = cuts.at(idx);
         } else {
             break;
         }
 
     }
+
+
+    updateOrAddEntry("results.txt", "Algorytm wspinaczkowy losowy sąsiad", iterations, convergence, best_value);
+    /*plik.open("results.txt", ios_base::app);
+    if (plik.is_open()) {
+        plik << "Metoda: Algorytm wspinaczkowy losowy sąsiad\n";
+        plik << "Iteracje: " << iterations << "\n";
+        plik << "Zbieżność: " << convergence << "\n";
+        plik << "Zasoby: " << iterations - convergence << "\n";
+        plik << "Cut: " << goal(cut) << "\n";
+        plik.close();
+    } else {
+        cerr << "Nie można otworzyć pliku do zapisu\n";
+    }*/
+
+
     return cut;
 }
 
@@ -634,6 +818,9 @@ int main(int argc, char *argv[]) {
     G.maximumCut();
 
     vector<int> result;
+    chrono::system_clock::time_point start_time;
+    chrono::system_clock::time_point end_time;
+    chrono::nanoseconds computation_time;
 
     for (auto &method: methods) {
         for (auto &omethod: output_methods) {
@@ -644,7 +831,20 @@ int main(int argc, char *argv[]) {
                         printDetailsAboutCut(G, result);
                         break;
                     case 1:
-                        result = solve_random(G);
+                        start_time = chrono::system_clock::now();
+                        result = solve_random(G, 1000);
+                        end_time = chrono::system_clock::now();
+                        computation_time = chrono::duration_cast<chrono::nanoseconds>(end_time - start_time);
+
+
+                        updateOrAddTimeEntry("results.txt", "Metoda losowości", computation_time);
+                        /*plik.open("results.txt", ios_base::app);
+                        if (plik.is_open()) {
+                            plik << "Czas: " << computation_time.count() << "\n";
+                            plik.close();
+                        } else {
+                            cerr << "Nie można otworzyć pliku do zapisu\n";
+                        }*/
                         printDetailsAboutCut(G, result);
                         break;
                     case 2:
@@ -652,23 +852,51 @@ int main(int argc, char *argv[]) {
                         printDetailsAboutCut(G, result);
                         break;
                     case 3:
-                        result = solve_hill_climbing_best_neighbour(G);
+                        start_time = chrono::system_clock::now();
+                        result = solve_hill_climbing_best_neighbour(G, 1000);
+                        end_time = chrono::system_clock::now();
+                        computation_time = chrono::duration_cast<chrono::nanoseconds>(end_time - start_time);
+
+                        updateOrAddTimeEntry("results.txt", "Algorytm wspinaczkowy najlepszy sąsiad", computation_time);
+
+                        /*plik.open("results.txt", ios_base::app);
+                        if (plik.is_open()) {
+                            plik << "Czas: " << computation_time.count() << "\n";
+                            plik.close();
+                        } else {
+                            cerr << "Nie można otworzyć pliku do zapisu\n";
+                        }*/
+
                         printDetailsAboutCut(G, result);
                         break;
                     case 4:
-                        result = solve_hill_climbing_random_neighbour(G,1000);
+                        start_time = chrono::system_clock::now();
+                        result = solve_hill_climbing_random_neighbour(G, 1000);
+                        end_time = chrono::system_clock::now();
+                        computation_time = chrono::duration_cast<chrono::nanoseconds>(end_time - start_time);
+
+                        updateOrAddTimeEntry("results.txt", "Algorytm wspinaczkowy losowy sąsiad", computation_time);
+
+                        /*plik.open("results.txt", ios_base::app);
+                        if (plik.is_open()) {
+                            plik << "Czas: " << computation_time.count() << "\n";
+                            plik.close();
+                        } else {
+                            cerr << "Nie można otworzyć pliku do zapisu\n";
+                        }*/
+
                         printDetailsAboutCut(G, result);
                         break;
                     case 5:
-                        result = solve_tabu(G);
+                        result = solve_tabu(G, 20);
                         printDetailsAboutCut(G, result);
                         break;
                     case 6:
-                        result = solve_sim_annealing(G);
+                        result = solve_sim_annealing(G, 1000);
                         printDetailsAboutCut(G, result);
                         break;
                     case 7:
-                        result = solve_genetic_algorithm(G);
+                        result = solve_genetic_algorithm(G, 1000);
                         printDetailsAboutCut(G, result);
                         break;
                 }
