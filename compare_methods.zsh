@@ -4,7 +4,7 @@ SOURCE_FILE="main.cpp"
 
 EXECUTABLE="metaheuristic_project"
 
-methods=("Własna metoda" "Metoda losowości" "Algorytm pełnego przeglądu" "Algorytm wspinaczkowy najlepszy sąsiad" "Algorytm wspinaczkowy losowy sąsiad" "Algorytm tabu" "Algorytm symulowanego wyżarzania" "Algorytm genetyczny")
+methods=("Własna metoda" "Metoda losowości" "Algorytm pełnego przeglądu" "Algorytm wspinaczkowy najlepszy sąsiad" "Algorytm wspinaczkowy losowy sąsiad" "Algorytm tabu" "Algorytm symulowanego wyżarzania" "Algorytm genetyczny model tradycyjny" "Algorytm genetyczny model wyspowy")
 
 
 choose_method() {

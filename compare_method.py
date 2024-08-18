@@ -7,7 +7,8 @@ cut_values = []
 times = []
 resources = []
 
-bar_colors = ['tab:red', 'tab:blue', 'tab:orange']
+# dodać kolory dla więcej metod
+bar_colors = ['tab:red', 'tab:blue', 'tab:orange', 'tab:purple', 'tab:green']
 
 file = open('/Users/dawid/ClionProjects/maxcut/results.txt', 'r')
 
@@ -32,9 +33,6 @@ for line in file:
     elif (name == "Czas"):
         times.append(int(value))
 
-print(times)
-print(resources)
-
 fig1, ax1 = plt.subplots()
 ax1.bar(methods, cut_values, label=methods, color=bar_colors)
 ax1.set_ylabel('Wartość')
@@ -55,8 +53,6 @@ ax3.set_ylabel('Czas(s)')
 ax3.set_title('Porównanie metod względem czasu wykonania')
 ax3.set_xticks([])
 ax3.legend(title='Metody')
-
-print(convergence)
 
 fig4, ax4 = plt.subplots()
 

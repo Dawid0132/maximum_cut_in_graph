@@ -2,17 +2,29 @@ Metoda: Algorytm wspinaczkowy najlepszy sąsiad
 Iteracje: 1000
 Zbieżność: 0
 Zasoby: 1000
-Cut: 5
-Czas: 33193000
+Cut: 10
+Czas: 75661000
 Metoda: Algorytm wspinaczkowy losowy sąsiad
 Iteracje: 1000
 Zbieżność: 1
 Zasoby: 999
-Cut: 5
-Czas: 407000
+Cut: 8
+Czas: 609000
 Metoda: Metoda losowości
 Iteracje: 1000
-Zbieżność: 964
-Zasoby: 36
-Cut: 6
-Czas: 8353000
+Zbieżność: 996
+Zasoby: 4
+Cut: 10
+Czas: 13578000
+Metoda: Algorytm genetyczny model wyspowy
+Iteracje: 1000
+Zbieżność: 999
+Zasoby: 1
+Cut: 10
+Czas: 71694098000
+Metoda: Algorytm genetyczny model tradycyjny
+Iteracje: 1000
+Zbieżność: 999
+Zasoby: 1
+Cut: 10
+Czas: 1762040000

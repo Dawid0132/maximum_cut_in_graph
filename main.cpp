@@ -91,14 +91,6 @@ public:
             }
         }
 
-        /*if (plik.is_open()) {
-            plik << "Własna metoda\n";
-            plik << "Zbieżność: " << convergence << "\n";
-            plik << "Cut: " << max_cut_weight << "\n";
-            plik.close();
-        } else {
-            cerr << "Nie można otworzyć pliku do zapisu\n";
-        }*/
 
         max_cut = max_cut_weight;
 
@@ -307,18 +299,6 @@ vector<int> solve_random(Graph g, int iterations = 20, double p_1 = 0.5) {
 
     updateOrAddEntry("results.txt", "Metoda losowości", iterations, convergence, cut_value);
 
-    /*plik.open("results.txt", ios_base::app);
-
-    if (plik.is_open()) {
-        plik << "Metoda: Metoda losowości\n";
-        plik << "Iteracje: " << iterations << "\n";
-        plik << "Zbieżność: " << convergence << "\n";
-        plik << "Zasoby: " << iterations - convergence << "\n";
-        plik << "Cut: " << cut_value << "\n";
-        plik.close();
-    } else {
-        cerr << "Nie można otworzyć pliku do zapisu\n";
-    }*/
 
     return random_cut_partition;
 }
@@ -398,18 +378,7 @@ vector<int> solve_hill_climbing_best_neighbour(Graph g, int iterations = 20) {
 
 
     updateOrAddEntry("results.txt", "Algorytm wspinaczkowy najlepszy sąsiad", iterations, convergence, best_value);
-    /*plik.open("results.txt", ios_base::app);
 
-    if (plik.is_open()) {
-        plik << "Metoda: Algorytm wspinaczkowy najlepszy sąsiad\n";
-        plik << "Iteracje: " << iterations << "\n";
-        plik << "Zbieżność: " << convergence << "\n";
-        plik << "Zasoby: " << iterations - convergence << "\n";
-        plik << "Cut: " << goal(cut) << "\n";
-        plik.close();
-    } else {
-        cerr << "Nie można otworzyć pliku do zapisu\n";
-    }*/
 
     return cut;
 }
@@ -442,17 +411,6 @@ vector<int> solve_hill_climbing_random_neighbour(Graph g, int iterations = 20) {
 
 
     updateOrAddEntry("results.txt", "Algorytm wspinaczkowy losowy sąsiad", iterations, convergence, best_value);
-    /*plik.open("results.txt", ios_base::app);
-    if (plik.is_open()) {
-        plik << "Metoda: Algorytm wspinaczkowy losowy sąsiad\n";
-        plik << "Iteracje: " << iterations << "\n";
-        plik << "Zbieżność: " << convergence << "\n";
-        plik << "Zasoby: " << iterations - convergence << "\n";
-        plik << "Cut: " << goal(cut) << "\n";
-        plik.close();
-    } else {
-        cerr << "Nie można otworzyć pliku do zapisu\n";
-    }*/
 
 
     return cut;
@@ -502,11 +460,9 @@ vector<int> solve_tabu(const Graph &g, int iterations = 20, int tabu_size = 1000
 }
 
 vector<int> generate_random_neighbour_norm(vector<int> partition) {
-    /*std::normal_distribution<double> distr;*/
     uniform_real_distribution<double> dist(0.0, 1.0);
 
     int count = dist(rdgen) + 1;
-    /*int count = distr(rdgen) + 1;*/
 
     if (count >= (partition.size() * 2))
         count = partition.size();
@@ -735,24 +691,145 @@ solve_genetic_algorithm(const Graph g, int iterations = 20, int pop_size = 100, 
         offspring = mutation(offspring, prob_mutation, mutation_type);
         population = offspring;
 
-        if (end_type) {
-            if (g.getMaxCut() == fitness(get_best())) {
-                break;
+
+        if (!conv_log) {
+            if (end_type) {
+                if (g.getMaxCut() == fitness(get_best())) {
+                    break;
+                }
+            } else {
+                if (goal(best_cut) < fitness(get_best())) {
+                    best_cut = get_best();
+                    improvmentCounter = 0;
+                } else if (improvmentCounter == 10) {
+                    break;
+                } else {
+                    improvmentCounter++;
+                }
             }
         } else {
             if (goal(best_cut) < fitness(get_best())) {
                 best_cut = get_best();
                 improvmentCounter = 0;
-            } else if (improvmentCounter == 10) {
-                break;
             } else {
                 improvmentCounter++;
             }
         }
     }
 
+    updateOrAddEntry("results.txt", "Algorytm genetyczny model tradycyjny", iterations, improvmentCounter,
+                     fitness(get_best()));
+
     return get_best();
 }
+
+vector<vector<int>> migration(double prob_migration, vector<vector<int>> population,
+                              std::function<int(const vector<int> &)> &fitness) {
+    std::uniform_real_distribution<double> u(0.0, 1.0);
+
+    auto get_best = [&]() {
+        return *std::max_element(population.begin(), population.end(), [&fitness](auto &l, auto &r) {
+            return fitness(l) < fitness(r);
+        });
+    };
+
+    vector<vector<int>> migration;
+
+    for (int i = 0; i < population.size(); ++i) {
+        if (u(rdgen) < prob_migration) {
+            migration.push_back(get_best());
+        }
+    }
+
+
+    return migration;
+}
+
+
+vector<int> solve_genetic_algorithm_island_model(const Graph g, int iterations = 20, int pop_size = 100,
+                                                 double prob_crossover = 0.9, double prob_mutation = 0.01,
+                                                 double prob_migration = 0.5,
+                                                 bool conv_log = true, bool mutation_type = true,
+                                                 bool crossover_type = true, bool end_type = true) {
+
+    vector<vector<int>> population;
+    vector<vector<int>> migration_land;
+
+    int improvmentCounter = 0;
+    vector<int> best_cut;
+
+    for (int i = 0; i < pop_size; ++i) {
+        population.push_back(generate_random_cut(g));
+    }
+
+    auto goal = goal_factory(g.getEdges());
+
+    function<int(const vector<int> &)> fitness = [goal](const vector<int> &specimen) {
+        int g = goal(specimen);
+
+        if (g < 0)
+            return 0;
+
+        return g;
+    };
+
+    auto get_best = [&]() {
+        return *std::max_element(population.begin(), population.end(), [&fitness](auto &l, auto &r) {
+            return fitness(l) < fitness(r);
+        });
+    };
+
+    for (int i = 0; i < iterations; ++i) {
+
+        vector<int> fitnesses = fit(population, fitness);
+        vector<int> parents = selection(fitnesses);
+        vector<vector<int>> offspring = crossover(population, parents, prob_crossover, crossover_type);
+        offspring = mutation(offspring, prob_mutation, mutation_type);
+        population = offspring;
+
+        migration_land = migration(prob_migration, population, fitness);
+
+        while (!migration_land.empty()) {
+            vector<int> migrant = migration_land.back();
+            migration_land.pop_back();
+            auto worst = std::min_element(population.begin(), population.end(), [&fitness](auto &l, auto &r) {
+                return fitness(l) > fitness(r);
+            });
+            *worst = migrant;
+        }
+
+        if (!conv_log) {
+            if (end_type) {
+                if (g.getMaxCut() == fitness(get_best())) {
+                    break;
+                }
+            } else {
+                if (goal(best_cut) < fitness(get_best())) {
+                    best_cut = get_best();
+                    improvmentCounter = 0;
+                } else if (improvmentCounter == 10) {
+                    break;
+                } else {
+                    improvmentCounter++;
+                }
+            }
+        } else {
+            if (goal(best_cut) < fitness(get_best())) {
+                best_cut = get_best();
+                improvmentCounter = 0;
+            } else {
+                improvmentCounter++;
+            }
+        }
+
+    }
+
+    updateOrAddEntry("results.txt", "Algorytm genetyczny model wyspowy", iterations, improvmentCounter,
+                     fitness(get_best()));
+
+    return get_best();
+}
+
 
 int main(int argc, char *argv[]) {
 
@@ -811,7 +888,8 @@ int main(int argc, char *argv[]) {
 
     vector<string> methods = {"Własna metoda", "Metoda losowości", "Algorytm pełnego przeglądu",
                               "Algorytm wspinaczkowy najlepszy sąsiad", "Algorytm wspinaczkowy losowy sąsiad",
-                              "Algorytm tabu", "Algorytm symulowanego wyżarzania", "Algorytm genetyczny"};
+                              "Algorytm tabu", "Algorytm symulowanego wyżarzania", "Algorytm genetyczny model tradycyjny",
+                              "Algorytm genetyczny model wyspowy"};
 
     int indexOfMethods = 0;
 
@@ -838,13 +916,7 @@ int main(int argc, char *argv[]) {
 
 
                         updateOrAddTimeEntry("results.txt", "Metoda losowości", computation_time);
-                        /*plik.open("results.txt", ios_base::app);
-                        if (plik.is_open()) {
-                            plik << "Czas: " << computation_time.count() << "\n";
-                            plik.close();
-                        } else {
-                            cerr << "Nie można otworzyć pliku do zapisu\n";
-                        }*/
+
                         printDetailsAboutCut(G, result);
                         break;
                     case 2:
@@ -859,13 +931,6 @@ int main(int argc, char *argv[]) {
 
                         updateOrAddTimeEntry("results.txt", "Algorytm wspinaczkowy najlepszy sąsiad", computation_time);
 
-                        /*plik.open("results.txt", ios_base::app);
-                        if (plik.is_open()) {
-                            plik << "Czas: " << computation_time.count() << "\n";
-                            plik.close();
-                        } else {
-                            cerr << "Nie można otworzyć pliku do zapisu\n";
-                        }*/
 
                         printDetailsAboutCut(G, result);
                         break;
@@ -877,13 +942,6 @@ int main(int argc, char *argv[]) {
 
                         updateOrAddTimeEntry("results.txt", "Algorytm wspinaczkowy losowy sąsiad", computation_time);
 
-                        /*plik.open("results.txt", ios_base::app);
-                        if (plik.is_open()) {
-                            plik << "Czas: " << computation_time.count() << "\n";
-                            plik.close();
-                        } else {
-                            cerr << "Nie można otworzyć pliku do zapisu\n";
-                        }*/
 
                         printDetailsAboutCut(G, result);
                         break;
@@ -896,7 +954,23 @@ int main(int argc, char *argv[]) {
                         printDetailsAboutCut(G, result);
                         break;
                     case 7:
+                        start_time = chrono::system_clock::now();
                         result = solve_genetic_algorithm(G, 1000);
+                        end_time = chrono::system_clock::now();
+
+                        computation_time = chrono::duration_cast<chrono::nanoseconds>(end_time - start_time);
+
+                        updateOrAddTimeEntry("results.txt", "Algorytm genetyczny model tradycyjny", computation_time);
+                        printDetailsAboutCut(G, result);
+                        break;
+                    case 8:
+                        start_time = chrono::system_clock::now();
+                        result = solve_genetic_algorithm_island_model(G, 1000);
+                        end_time = chrono::system_clock::now();
+
+                        computation_time = chrono::duration_cast<chrono::nanoseconds>(end_time - start_time);
+
+                        updateOrAddTimeEntry("results.txt", "Algorytm genetyczny model wyspowy", computation_time);
                         printDetailsAboutCut(G, result);
                         break;
                 }
